@@ -495,7 +495,7 @@ Original order of work (done; there is no presentation, the project is open sour
   *Done:* The browser only talks to Readhouse; audio is cached and served by hash.
 
 - [x] **Read on a Kindle through KOReader (user, 2026-11-07).** A KOReader plugin
-  (readhouse-koreader, its own repo) reads the open book aloud
+  ([readhouse.koplugin](https://github.com/mm0x1/readhouse.koplugin)) reads the open book aloud
   with Readhouse's voices; Readhouse does all the speech work, the Kindle only sends text and
   plays audio. Three endpoints: `POST /api/speak/passages` splits text with the library's
   passage length (`splitIntoSegments`), `POST /api/speak` speaks one passage through the same
