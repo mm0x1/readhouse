@@ -1,9 +1,8 @@
 import { error, json } from '@sveltejs/kit';
 import * as v from 'valibot';
 import { app } from '#lib/server/app.js';
-import { AllTalkError } from '#lib/server/alltalk.js';
 import { readJson } from '#lib/server/http.js';
-import { ModelChanged, SpeechCancelled } from '#lib/server/speech.js';
+import { speechFailure } from '#lib/server/speech-errors.js';
 import type { SpeechResult } from '#lib/speech.js';
 import { PASSAGE_MAX_CHARS, PASSAGE_MIN_CHARS, passageText } from '#lib/text/passages.js';
 import type { RequestHandler } from './$types';
@@ -52,11 +51,6 @@ export const POST: RequestHandler = async ({ request }) => {
 			passages: chapter.passages.length
 		} satisfies SpeechResult);
 	} catch (cause) {
-		if (cause instanceof SpeechCancelled) error(409, 'Cancelled.');
-		if (cause instanceof ModelChanged) error(409, cause.message);
-		if (cause instanceof AllTalkError) {
-			error(cause.kind === 'unreachable' ? 503 : 502, cause.message);
-		}
-		throw cause;
+		speechFailure(cause);
 	}
 };

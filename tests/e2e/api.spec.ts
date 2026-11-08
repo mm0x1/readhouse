@@ -245,6 +245,50 @@ test('speaks a passage and serves the audio with ranges and caching', async ({ r
 	expect(notModified.status()).toBe(304);
 });
 
+test('splits and speaks text from KOReader, and serves it as raw PCM', async ({ request }) => {
+	const text = 'The rain kept on all evening. '.repeat(20);
+	const split = await request.post('/api/speak/passages', { data: { text } });
+	expect(split.status()).toBe(200);
+	const { passages } = await split.json();
+	expect(passages.length).toBeGreaterThan(2);
+	expect(passages.join(' ')).toBe(text.trim());
+
+	const speak = await request.post('/api/speak', {
+		data: { text: passages[0], priority: 'now' }
+	});
+	expect(speak.status()).toBe(200);
+	const { audio } = await speak.json();
+	expect(audio).toMatch(/^\/api\/audio\/[0-9a-f]{64}$/);
+	// The same text again comes from the cache, at the same address.
+	const again = await request.post('/api/speak', { data: { text: passages[0], priority: 'soon' } });
+	expect((await again.json()).audio).toBe(audio);
+
+	const pcm = await request.get(`${audio}/pcm`, { headers: { 'accept-encoding': 'gzip, br' } });
+	expect(pcm.status()).toBe(200);
+	expect(pcm.headers()['x-pcm-format']).toBe('s16le;rate=22050;channels=1');
+	expect(pcm.headers()['content-encoding']).toBeUndefined();
+	const samples = await pcm.body();
+	expect(samples.length).toBeGreaterThan(0);
+	expect(samples.length % 2).toBe(0);
+	expect(samples.subarray(0, 4).toString()).not.toBe('RIFF');
+});
+
+test('refuses KOReader text it should not speak', async ({ request }) => {
+	const speak = (data: object) => request.post('/api/speak', { data });
+	expect((await speak({ text: '  \n ', priority: 'now' })).status()).toBe(422);
+	expect((await speak({ text: 'word '.repeat(300), priority: 'now' })).status()).toBe(422);
+	expect((await speak({ text: 'x'.repeat(5000), priority: 'now' })).status()).toBe(400);
+	expect((await speak({ text: 'Hello.', priority: 'later' })).status()).toBe(400);
+	expect((await speak({ text: 'Hello.', priority: 'now', voice: 'x.wav' })).status()).toBe(400);
+
+	const split = (data: object) => request.post('/api/speak/passages', { data });
+	expect((await split({ text: 'a'.repeat(20_001) })).status()).toBe(400);
+	expect((await split({ text: 42 })).status()).toBe(400);
+	expect((await split({ text: '' })).status()).toBe(200);
+
+	expect((await request.get(`/api/audio/${'0'.repeat(64)}/pcm`)).status()).toBe(404);
+});
+
 test('compresses pages and JSON, never audio', async ({ request }) => {
 	const page = await request.get(`/book/${bookId}`, { headers: { 'accept-encoding': 'gzip, br' } });
 	expect(page.headers()['content-encoding']).toBe('br');
@@ -322,6 +366,11 @@ test.describe('with a passcode', () => {
 	test('locks the API and pages until unlocked', async ({ playwright }) => {
 		const request = await playwright.request.newContext({ baseURL: LOCKED });
 		expect((await request.get('/api/books')).status()).toBe(401);
+		const speak = await request.post('/api/speak', {
+			data: { text: 'Hello.', priority: 'now' },
+			headers: { origin: LOCKED }
+		});
+		expect(speak.status()).toBe(401);
 		const page = await request.get('/', { maxRedirects: 0 });
 		expect(page.status()).toBe(303);
 		expect(page.headers()['location']).toBe('/unlock?next=%2F');

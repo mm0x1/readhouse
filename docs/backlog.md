@@ -494,6 +494,20 @@ Original order of work (done; there is no presentation, the project is open sour
   audio URLs stop breaking when the host's address differs between LAN and Tailscale.
   *Done:* The browser only talks to Readhouse; audio is cached and served by hash.
 
+- [x] **Read on a Kindle through KOReader (user, 2026-11-07).** A KOReader plugin
+  (readhouse-koreader, its own repo) reads the open book aloud
+  with Readhouse's voices; Readhouse does all the speech work, the Kindle only sends text and
+  plays audio. Three endpoints: `POST /api/speak/passages` splits text with the library's
+  passage length (`splitIntoSegments`), `POST /api/speak` speaks one passage through the same
+  queue, cache and voice settings as `/api/speech`, and `GET /api/audio/<hash>/pcm` streams
+  cached audio decoded by ffmpeg to raw s16le mono 22050 Hz, because a Kindle's GStreamer 0.10
+  has no decoders. Verified by ear on a Paperwhite 5 with Bluetooth headphones.
+  *Security:* `/api/speak` is the first endpoint that speaks text from the request (`/api/speech`
+  still never does). It sits behind the passcode like everything else, is capped at one
+  passage (1000 characters after whitespace is collapsed, 16 KB body), and fills the same
+  capped LRU cache; splitting is capped at 20,000 characters. The PCM stream kills ffmpeg when
+  the client hangs up. *Open:* the plugin cannot unlock a passcode-protected Readhouse yet.
+
 ## Stability testing
 
 - [x] **Test tooling and a check gate.** Vitest for units, Playwright for end-to-end; one
@@ -883,3 +897,8 @@ One line per work session: date, what was done, what's next.
   quarter of the frame (the recorder draws the page at CSS size; now cropped and scaled).
   `readhouse` fast-forwarded onto `main`.
 - 2026-11-03: GitHub repo renamed to `readhouse` (old links redirect); first release, v1.0.0.
+- 2026-11-07: Kindle reading through KOReader (`kindle-speak` branch): `/api/speak`,
+  `/api/speak/passages` and `/api/audio/<hash>/pcm`, API tests for each, plus the new
+  readhouse-koreader plugin. Verified on a Paperwhite 5: reads from the current page, gapless,
+  turns pages. Found on the device: mixersink stops on partial buffers, so the plugin feeds it
+  whole 4 KB blocks.

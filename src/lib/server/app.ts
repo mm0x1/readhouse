@@ -20,7 +20,7 @@ import { Library } from './library.js';
 import { SettingsStore } from './settings.js';
 import { Preparer } from './prepare.js';
 import { Speech } from './speech.js';
-import { findTranscoder } from './transcode.js';
+import { findPcmDecoder, findTranscoder, type PcmDecoder } from './transcode.js';
 
 const ENGINE_INFO_TTL_MS = 30_000;
 
@@ -39,6 +39,8 @@ export interface Services {
 	/** Whole books prepared ahead with the settings of that moment. */
 	preparer: Preparer;
 	access: Access;
+	/** Decodes cached audio for the KOReader plugin; null without ffmpeg. */
+	pcm: Promise<PcmDecoder | null>;
 	/** AllTalk's engine and model, cached briefly; they key the audio cache. */
 	engineInfo(): Promise<EngineInfo>;
 	/** Drops the cached engine info, after Readhouse changed AllTalk's model or modes. */
@@ -93,6 +95,7 @@ export function createServices(options: {
 		speech,
 		preparer: new Preparer(db, library, speech),
 		access: new Access(options.passcode, dataDir),
+		pcm: findPcmDecoder(),
 		engineInfo,
 		forgetEngine: () => (engineCache = null)
 	};
