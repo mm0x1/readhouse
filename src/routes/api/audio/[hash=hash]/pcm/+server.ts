@@ -10,10 +10,10 @@ import type { RequestHandler } from './$types';
  */
 export const GET: RequestHandler = async ({ params, request }) => {
 	const { speech, pcm } = app();
-	const decoder = await pcm;
-	if (!decoder) error(501, 'Playing on a Kindle needs ffmpeg on the Readhouse computer.');
 	const audio = speech.cached(params.hash);
 	if (!audio) error(404, 'No such audio.');
+	const decoder = await pcm;
+	if (!decoder) error(501, 'Playing on a Kindle needs ffmpeg on the Readhouse computer.');
 	return new Response(decoder.decode(audio.path, request.signal), {
 		headers: {
 			'content-type': 'application/octet-stream',

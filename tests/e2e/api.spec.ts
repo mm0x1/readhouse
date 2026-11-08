@@ -264,6 +264,14 @@ test('splits and speaks text from KOReader, and serves it as raw PCM', async ({ 
 	expect((await again.json()).audio).toBe(audio);
 
 	const pcm = await request.get(`${audio}/pcm`, { headers: { 'accept-encoding': 'gzip, br' } });
+	// Decoding needs ffmpeg, like AAC compression: stored audio is AAC exactly when it is there
+	// (AUDIO_FORMAT=auto). Without it the Kindle gets a clear refusal instead of noise.
+	const stored = await request.get(audio);
+	if (stored.headers()['content-type'] !== 'audio/mp4') {
+		expect(pcm.status()).toBe(501);
+		expect((await pcm.json()).message).toContain('ffmpeg');
+		return;
+	}
 	expect(pcm.status()).toBe(200);
 	expect(pcm.headers()['x-pcm-format']).toBe('s16le;rate=22050;channels=1');
 	expect(pcm.headers()['content-encoding']).toBeUndefined();
